@@ -5,13 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Muhammad Jundi Assabiq &middot; Portfolio</title>
 
-  <meta name="description" content="Portfolio of Muhammad Jundi Assabiq, an undergraduate Informatics student passionate about automation and software development.">
+  <meta name="description" content="Muhammad Jundi Assabiq (Jundi) — Informatics student at Universitas Jenderal Soedirman and web developer from Purbalingga. Portfolio: SoedKos, EcoTani, Picis.">
+  <meta name="author" content="Muhammad Jundi Assabiq">
+  <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#000000">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Muhammad Jundi Assabiq &middot; Portfolio">
-  <meta property="og:description" content="Portfolio of Muhammad Jundi Assabiq, an undergraduate Informatics student passionate about automation and software development.">
+
+  <link rel="canonical" href="https://jundiaiq.my.id/">
+
+  <meta property="og:type" content="profile">
+  <meta property="og:url" content="https://jundiaiq.my.id/">
+  <meta property="og:title" content="Muhammad Jundi Assabiq · Portfolio">
+  <meta property="og:description" content="Muhammad Jundi Assabiq (Jundi) — Informatics student at Universitas Jenderal Soedirman and web developer from Purbalingga. Portfolio: SoedKos, EcoTani, Picis.">
   <meta property="og:image" content="https://jundiaiq.my.id/assets/images/og-image.png">
+  <meta property="profile:first_name" content="Muhammad Jundi">
+  <meta property="profile:last_name" content="Assabiq">
+
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Muhammad Jundi Assabiq · Portfolio">
+  <meta name="twitter:description" content="Muhammad Jundi Assabiq (Jundi) — Informatics student at Universitas Jenderal Soedirman and web developer from Purbalingga. Portfolio: SoedKos, EcoTani, Picis.">
   <meta name="twitter:image" content="https://jundiaiq.my.id/assets/images/og-image.png">
 
   <link rel="icon" type="image/png" href="assets/images/favicon.png?v=2">
@@ -33,6 +44,44 @@
       try { if (sessionStorage.getItem('introSeen')) d.classList.add('intro-quick'); } catch (e) {}
     })();
   </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://jundiaiq.my.id/#person",
+      "name": "Muhammad Jundi Assabiq",
+      "alternateName": ["Jundi Assabiq", "Jundi", "Assabiq", "Muhammad Jundi"],
+      "url": "https://jundiaiq.my.id/",
+      "image": "https://jundiaiq.my.id/assets/images/pfp.jpg",
+      "jobTitle": "Web Developer",
+      "description": "Informatics student at Universitas Jenderal Soedirman and web developer from Purbalingga, Indonesia. Creator of SoedKos, EcoTani, and Picis.",
+      "affiliation": {
+        "@type": "CollegeOrUniversity",
+        "name": "Universitas Jenderal Soedirman"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Purbalingga",
+        "addressRegion": "Jawa Tengah",
+        "addressCountry": "ID"
+      },
+      "sameAs": [
+        "https://github.com/jundiassabiq",
+        "https://id.linkedin.com/in/muhammad-jundi-assabiq-913575368"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://jundiaiq.my.id/#website",
+      "url": "https://jundiaiq.my.id/",
+      "name": "Muhammad Jundi Assabiq · Portfolio",
+      "about": { "@id": "https://jundiaiq.my.id/#person" }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -85,10 +134,10 @@
     <div class="hero-vignette" aria-hidden="true"></div>
 
     <!-- Hero headline, top-left, aligned with the page grid -->
-    <h1 class="hero-hello">
+    <p class="hero-hello">
       <span class="hello-line">Hello,</span>
       <span class="hello-line">world.</span>
-    </h1>
+    </p>
 
   </section>
 
@@ -102,7 +151,7 @@
         <div class="profile-row reveal">
           <img src="assets/images/pfp.jpg" alt="Muhammad Jundi Assabiq" class="profile-avatar" id="profile-avatar" onerror="this.onerror=null;this.src='assets/images/avatar.jpg'">
           <div class="profile-meta">
-            <h2 class="profile-name" id="profile-name">Muhammad Jundi Assabiq</h2>
+            <h1 class="profile-name" id="profile-name">Muhammad Jundi Assabiq</h1>
             <p class="profile-bio" id="profile-bio">What's good?</p>
           </div>
           <div class="profile-socials" id="profile-socials"></div>

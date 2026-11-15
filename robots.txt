@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jundiaiq.my.id/sitemap.xml
