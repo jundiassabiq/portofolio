@@ -1,0 +1,8 @@
+# Local backups and source files that should not be published
+_backup-before-redesign/
+style.light.backup.css
+assets/js/earth.light.backup.js
+JANGAN HAPUS/
+# Originals; the site uses the copies in assets/images/
+/pfp.jpg
+/icon-web.jpg
