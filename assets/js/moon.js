@@ -18,7 +18,7 @@ class HalfMoon extends FullscreenHalfEarth {
   setupLights() {}
 
   buildBody() {
-    const segments = 160;
+    const segments = this.lowPower ? 96 : 160;
 
     this.moonMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -61,9 +61,8 @@ class HalfMoon extends FullscreenHalfEarth {
     // Very soft halo, like light scattering around the Moon in a long-lens photo
     this.earthGroup.add(this.createHalo());
 
-    const loader = new THREE.TextureLoader();
-    loader.load('assets/textures/moon_color.jpg', (tex) => {
-      tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this.loadTexture('assets/textures/moon_color.webp', (tex) => {
+      tex.anisotropy = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.lowPower ? 4 : 8);
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       this.moonMaterial.uniforms.uMap.value = tex;
       this.moonMaterial.uniforms.uHasMap.value = 1;
@@ -95,17 +94,22 @@ class HalfMoon extends FullscreenHalfEarth {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.contactMoon = new HalfMoon('moon-canvas', 'contact', {
-    anchor: 'top',
-    heightFactor: 0.4,
-    widthFactorLandscape: 0.5,
-    widthFactorPortrait: 1.05,
-    tilt: 0.5,                     // shows the southern maria, highlands and Tycho's rays
-    initialRotation: -Math.PI / 2, // near side faces the viewer
-    rotationSpeed: 0,              // tidally locked: it does not spin...
-    libration: 0.09,               // ...it only sways gently, like real lunar libration
-    interactive: false,            // the contact form sits on top, so no drag-to-spin here
-    lazy: true                     // build only when the contact section is near
-  });
-});
+(() => {
+  const start = () => {
+    window.contactMoon = new HalfMoon('moon-canvas', 'contact', {
+      anchor: 'top',
+      heightFactor: 0.4,
+      widthFactorLandscape: 0.5,
+      widthFactorPortrait: 1.05,
+      tilt: 0.5,                     // shows the southern maria, highlands and Tycho's rays
+      initialRotation: -Math.PI / 2, // near side faces the viewer
+      rotationSpeed: 0,              // tidally locked: it does not spin...
+      libration: 0.09,               // ...it only sways gently, like real lunar libration
+      interactive: false,            // the contact form sits on top, so no drag-to-spin here
+      lazy: true                     // build only when the contact section is near
+    });
+  };
+  // Injected after first paint (see index.html), so the DOM is usually ready already
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();

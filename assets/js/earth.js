@@ -65,6 +65,10 @@ class FullscreenHalfEarth {
     this.clock = null;
     this.reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    // Lighter rendering on phones/tablets: lower pixel ratio, no MSAA, smaller bakes, fewer stars
+    this.lowPower = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
+    this.pixelRatio = Math.min(window.devicePixelRatio || 1, this.lowPower ? 1.5 : 2);
+
     if (this.options.lazy && 'IntersectionObserver' in window) {
       const lazyObserver = new IntersectionObserver((entries) => {
         if (!entries.some((e) => e.isIntersecting)) return;
@@ -141,6 +145,30 @@ class FullscreenHalfEarth {
   }
 
   /**
+   * Loads a texture. On Chromium the image is decoded off the main thread
+   * (createImageBitmap); elsewhere it falls back to the regular TextureLoader.
+   * Both go through THREE.DefaultLoadingManager, so intro.js still tracks them.
+   */
+  loadTexture(url, onLoad, onError) {
+    const offThread = typeof createImageBitmap === 'function' && !!navigator.userAgentData && THREE.ImageBitmapLoader;
+    if (!offThread) {
+      if (!this.textureLoader) this.textureLoader = new THREE.TextureLoader();
+      this.textureLoader.load(url, onLoad, undefined, onError);
+      return;
+    }
+    if (!this.bitmapLoader) {
+      this.bitmapLoader = new THREE.ImageBitmapLoader();
+      this.bitmapLoader.setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' });
+    }
+    this.bitmapLoader.load(url, (bitmap) => {
+      const tex = new THREE.Texture(bitmap);
+      tex.flipY = false; // already flipped during decoding
+      tex.needsUpdate = true;
+      onLoad(tex);
+    }, undefined, onError);
+  }
+
+  /**
    * Deep-space backdrop behind the Earth:
    * - a procedural Milky Way band with gas, dust lanes and faint nebula clouds
    *   (rendered once into a texture, so it costs nothing per frame)
@@ -167,7 +195,45 @@ class FullscreenHalfEarth {
     const planeW = halfH * 2 * 3.2;
     const planeH = halfH * 2 * 1.4;
 
-    const rtW = 2560;
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.nebulaMesh = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), material);
+    this.nebulaMesh.position.z = -dist;
+    this.nebulaMesh.renderOrder = -2;
+    this.nebulaMesh.visible = false; // shown once its texture is ready
+    // Match the far star layer's on-screen parallax at this depth
+    this.nebulaParallax = 0.5 * (dist + 5) / (57 + 5);
+    this.scene.add(this.nebulaMesh);
+
+    const useTexture = (tex) => {
+      tex.encoding = THREE.sRGBEncoding;
+      material.map = tex;
+      material.needsUpdate = true;
+      this.nebulaMesh.visible = true;
+    };
+
+    // The nebula is static, so it ships pre-baked (assets/textures/nebula*.webp, ~6-18 KB).
+    // Baking it at runtime took seconds of GPU time on phones. The bake below is only a
+    // fallback if the image is missing; to regenerate the image, run bakeNebula() and export it.
+    this.loadTexture(
+      this.lowPower ? 'assets/textures/nebula-sm.webp' : 'assets/textures/nebula.webp',
+      (tex) => {
+        // Match the old render-target sampling (no mipmaps, linear filtering)
+        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearFilter;
+        useTexture(tex);
+      },
+      () => useTexture(this.bakeNebula(planeW, planeH, halfH))
+    );
+  }
+
+  bakeNebula(planeW, planeH, halfH) {
+    const rtW = this.lowPower ? 1280 : 2560;
     const rtH = Math.round(rtW * (planeH / planeW));
     const target = new THREE.WebGLRenderTarget(rtW, rtH, { depthBuffer: false });
 
@@ -257,25 +323,11 @@ class FullscreenHalfEarth {
     this.renderer.toneMapping = prevToneMapping;
     bakeMaterial.dispose();
 
-    target.texture.encoding = THREE.sRGBEncoding;
-    const material = new THREE.MeshBasicMaterial({
-      map: target.texture,
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending
-    });
-
-    this.nebulaMesh = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), material);
-    this.nebulaMesh.position.z = -dist;
-    this.nebulaMesh.renderOrder = -2;
-    // Match the far star layer's on-screen parallax at this depth
-    this.nebulaParallax = 0.5 * (dist + 5) / (57 + 5);
-    this.scene.add(this.nebulaMesh);
+    return target.texture;
   }
 
   createStarLayers() {
-    const pixelRatio = Math.min(window.devicePixelRatio, 2);
+    const pixelRatio = this.pixelRatio;
     const camZ = this.camera.position.z;
     const band = this.band;
 
@@ -337,6 +389,8 @@ class FullscreenHalfEarth {
       }`;
 
     layers.forEach((cfg) => {
+      // Half the stars on low-power devices (they are tiny on small screens anyway)
+      if (this.lowPower) cfg.count = Math.round(cfg.count * 0.5);
       const positions = new Float32Array(cfg.count * 3);
       const sizes = new Float32Array(cfg.count);
       const phases = new Float32Array(cfg.count);
@@ -523,6 +577,10 @@ class FullscreenHalfEarth {
     });
 
     this.earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
+    // The globe stays hidden until the real maps arrive: compiling the PBR shader for the
+    // placeholder and then again for the final maps doubled the startup cost.
+    // The intro covers this short wait.
+    this.earthGroup.visible = false;
     this.earthGroup.add(this.earthMesh);
 
     // Soft Atmospheric Cloud Layer
@@ -551,33 +609,40 @@ class FullscreenHalfEarth {
     this.atmosphereMesh = new THREE.Mesh(new THREE.SphereGeometry(1.035, segments, segments), atmosphereMaterial);
     this.earthGroup.add(this.atmosphereMesh);
 
-    // 6. Seamlessly upgrade to High-Res Textures
-    const textureLoader = new THREE.TextureLoader();
-    const maxAniso = this.renderer.capabilities.getMaxAnisotropy();
-
-    textureLoader.load('assets/textures/earth_day.jpg', (tex) => {
-      tex.encoding = THREE.sRGBEncoding;
-      tex.anisotropy = maxAniso;
-      earthMaterial.map = tex;
+    // 6. Seamlessly upgrade to high-res textures (WebP: ~4x smaller than the old JPG/PNG).
+    // The three Earth maps are applied together, so the PBR shader recompiles once, not three times.
+    const maxAniso = Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.lowPower ? 4 : 8);
+    const earthMaps = {};
+    let pendingEarthMaps = 3;
+    const applyEarthMaps = () => {
+      if (--pendingEarthMaps > 0) return;
+      if (earthMaps.day) earthMaterial.map = earthMaps.day;
+      if (earthMaps.normal) {
+        earthMaterial.normalMap = earthMaps.normal;
+        earthMaterial.normalScale = new THREE.Vector2(0.8, 0.8);
+      }
+      // Specular map: oceans are slightly glossier than land (still very soft)
+      if (earthMaps.spec) {
+        earthMaterial.roughnessMap = earthMaps.spec;
+        earthMaterial.roughness = 1.0;
+      }
       earthMaterial.needsUpdate = true;
-    });
+      this.earthGroup.visible = true; // procedural placeholder stays as the map if day.webp failed
+    };
+    const loadEarthMap = (key, url, setup) => {
+      this.loadTexture(url, (tex) => {
+        tex.anisotropy = maxAniso;
+        if (setup) setup(tex);
+        earthMaps[key] = tex;
+        applyEarthMaps();
+      }, applyEarthMaps); // a failed map must not block the others
+    };
 
-    textureLoader.load('assets/textures/earth_normal.jpg', (norm) => {
-      norm.anisotropy = maxAniso;
-      earthMaterial.normalMap = norm;
-      earthMaterial.normalScale = new THREE.Vector2(0.8, 0.8);
-      earthMaterial.needsUpdate = true;
-    });
+    loadEarthMap('day', 'assets/textures/earth_day.webp', (tex) => { tex.encoding = THREE.sRGBEncoding; });
+    loadEarthMap('normal', 'assets/textures/earth_normal.webp');
+    loadEarthMap('spec', 'assets/textures/earth_specular.webp');
 
-    // Specular map: oceans are slightly glossier than land (still very soft)
-    textureLoader.load('assets/textures/earth_specular.jpg', (spec) => {
-      spec.anisotropy = maxAniso;
-      earthMaterial.roughnessMap = spec;
-      earthMaterial.roughness = 1.0;
-      earthMaterial.needsUpdate = true;
-    });
-
-    textureLoader.load('assets/textures/earth_clouds.png', (cloudTex) => {
+    this.loadTexture('assets/textures/earth_clouds.webp', (cloudTex) => {
       cloudTex.encoding = THREE.sRGBEncoding;
       cloudTex.anisotropy = maxAniso;
       cloudsMaterial.map = cloudTex;
@@ -597,12 +662,15 @@ class FullscreenHalfEarth {
     // 2. High-performance WebGL Renderer with Apple White transparency
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: !this.lowPower,
       alpha: true,
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this.pixelRatio);
+    // Skip three.js's per-shader error queries: each one forces the CPU to wait for the GPU
+    // to finish compiling. Shaders here are fixed and known-good.
+    if (this.renderer.debug) this.renderer.debug.checkShaderErrors = false;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -749,6 +817,13 @@ class FullscreenHalfEarth {
 
     if (!this.isRendering) return;
 
+    // While the intro overlay covers the hero, draw only ~4 fps: enough to keep
+    // shaders compiled and textures uploaded, without competing with page loading.
+    if (document.documentElement.classList.contains('intro-pending')) {
+      const now = performance.now();
+      if (this.lastHiddenFrame && now - this.lastHiddenFrame < 250) return;
+      this.lastHiddenFrame = now;
+    }
     // Continuous majestic right-to-left rotation (deltaY < 0 moves front face from right to left)
     if (!this.isDragging) {
       this.targetRotationY -= this.rotationSpeed;
@@ -777,7 +852,12 @@ class FullscreenHalfEarth {
   }
 }
 
-// Auto-initialize on load
-document.addEventListener('DOMContentLoaded', () => {
-  window.fullscreenEarth = new FullscreenHalfEarth('earth-canvas', 'hero-fullscreen');
-});
+// Auto-initialize. This file is injected after first paint (see the loader in index.html),
+// so the DOM is usually ready already.
+(() => {
+  const start = () => {
+    window.fullscreenEarth = new FullscreenHalfEarth('earth-canvas', 'hero-fullscreen');
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();

@@ -5,10 +5,9 @@
 
 window.portfolioData = {
   user: {
-    // Save the new profile picture as assets/images/pfp.jpg.
-    // Until that file exists, the old avatar is shown as a fallback.
-    avatar: "assets/images/pfp.jpg",
-    avatarFallback: "assets/images/avatar.jpg",
+    // Small WebP for the 72px avatar; the full JPG stays for SEO/social previews.
+    avatar: "assets/images/pfp-160.webp",
+    avatarFallback: "assets/images/pfp.jpg",
     name: "Muhammad Jundi Assabiq",
     shortName: "Jundi",
     bio: "What's good?",
@@ -62,7 +61,7 @@ window.portfolioData = {
         badge: "Live",
         url: "https://jundiaiq.my.id",
         host: "jundiaiq.my.id",
-        image: "mockup/portofolio.png"
+        image: "mockup/portofolio.webp"
       },
       {
         title: "Soedkost",
@@ -70,7 +69,7 @@ window.portfolioData = {
         badge: "Live",
         url: "https://soedkost.jundiaiq.my.id",
         host: "soedkost.jundiaiq.my.id",
-        image: "mockup/soedkost.png"
+        image: "mockup/soedkost.webp"
       },
       {
         title: "Picis",

@@ -37,9 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
     : null;
 
+  const introCovering = document.documentElement.classList.contains('intro-pending');
+
   const observeReveals = (root = document) => {
     root.querySelectorAll('.reveal:not(.in)').forEach((el) => {
       if (!revealObserver) { el.classList.add('in'); return; }
+      // Content already on screen under the intro overlay: show it right away. Its reveal
+      // would play out of sight anyway, and painting it early keeps LCP from waiting.
+      if (introCovering && el.getBoundingClientRect().top < window.innerHeight) {
+        el.style.transition = 'none';
+        el.classList.add('in');
+        void el.offsetWidth; // commit the final state before restoring transitions
+        el.style.transition = '';
+        return;
+      }
       // Stagger siblings (cards in a grid, rows in a list) so they cascade in
       const siblings = el.parentElement
         ? Array.from(el.parentElement.children).filter((c) => c.classList.contains('reveal'))
@@ -55,11 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // --------------------------------------------------------------------------
   const statement = $('hero-subtitle');
   let statementWords = [];
+  let lastLitCount = -1;
 
   const splitStatement = (text) => {
     if (!statement) return;
     statement.innerHTML = text.split(/\s+/).map((w) => `<span class="word">${esc(w)}</span>`).join(' ');
     statementWords = Array.from(statement.querySelectorAll('.word'));
+    lastLitCount = -1;
     updateStatement();
   };
 
@@ -73,6 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const end = vh * 0.45;
     const progress = Math.min(Math.max((start - rect.top) / (start - end + rect.height), 0), 1);
     const litCount = Math.round(progress * statementWords.length);
+    if (litCount === lastLitCount) return; // nothing changed, skip touching every word
+    lastLitCount = litCount;
     statementWords.forEach((w, i) => w.classList.toggle('lit', i < litCount));
   };
 
@@ -151,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                </div>
              </div>`
           : `<div class="project-media">
-               <img src="${esc(p.image)}" alt="${esc(p.title)} mockup" loading="lazy">
+               <img src="${esc(p.image)}" alt="${esc(p.title)} mockup" width="1280" height="960" loading="lazy" decoding="async">
              </div>`;
 
         const info = `
@@ -234,11 +249,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const nav = $('globalnav');
   const navLinks = document.querySelectorAll('.nav-link, .mobile-link[data-nav]');
 
+  // Coalesce scroll events into one update per frame (avoids forced layouts mid-scroll)
+  let scrollTicking = false;
   const onScroll = () => {
-    const y = window.scrollY;
-    // Navbar pill appears once the user scrolls away from the hero top
-    nav && nav.classList.toggle('visible', y > 60);
-    updateStatement();
+    if (scrollTicking) return;
+    scrollTicking = true;
+    requestAnimationFrame(() => {
+      scrollTicking = false;
+      const y = window.scrollY;
+      // Navbar pill appears once the user scrolls away from the hero top
+      nav && nav.classList.toggle('visible', y > 60);
+      updateStatement();
+    });
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', updateStatement);
@@ -327,4 +349,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   setText('footer-year', new Date().getFullYear());
+
+  // --------------------------------------------------------------------------
+  // Bottom glass blur: content that hasn't scrolled up yet sits under a
+  // progressive frosted edge. Shown only while <main> is on screen and
+  // hidden as soon as the footer enters, so the footer is never blurred.
+  // --------------------------------------------------------------------------
+  const scrollBlur = $('scroll-blur');
+  const mainEl = document.querySelector('main');
+  const footerEl = document.querySelector('.footer');
+  if (scrollBlur && mainEl && footerEl && 'IntersectionObserver' in window) {
+    let mainVisible = false;
+    let footerVisible = false;
+    const sync = () => scrollBlur.classList.toggle('is-active', mainVisible && !footerVisible);
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.target === mainEl) mainVisible = entry.isIntersecting;
+        if (entry.target === footerEl) footerVisible = entry.isIntersecting;
+      });
+      sync();
+    });
+    observer.observe(mainEl);
+    observer.observe(footerEl);
+  }
 });

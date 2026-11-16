@@ -28,9 +28,8 @@
   <link rel="icon" type="image/png" href="assets/images/favicon.png?v=2">
   <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Self-hosted Inter (variable, latin subset, one 47 KB file for every weight) -->
+  <link rel="preload" as="font" href="assets/fonts/inter-latin.woff2" type="font/woff2" crossorigin>
 
   <link rel="stylesheet" href="style.css">
   <script>
@@ -43,6 +42,13 @@
       d.classList.add('intro-pending');
       try { if (sessionStorage.getItem('introSeen')) d.classList.add('intro-quick'); } catch (e) {}
     })();
+    // Resolved by the WebGL loader at the end of <body> once three.js has loaded
+    // (intro.js waits on it to track the Earth textures).
+    window.threeReady = new Promise(function (resolve, reject) {
+      window.resolveThree = resolve;
+      window.rejectThree = reject;
+    });
+    window.threeReady.catch(function () {});
   </script>
 <script type="application/ld+json">
 {
@@ -85,12 +91,27 @@
 </head>
 <body>
 
-  <!-- Intro overlay: shown while the Earth textures load, then fades away -->
+  <!-- Intro overlay: a spinning sun while the Earth textures load, then a circular wipe into the page -->
   <div class="intro" id="intro" aria-hidden="true">
     <div class="intro-inner">
-      <p class="intro-name">Muhammad Jundi Assabiq</p>
-      <div class="intro-bar"><span id="intro-bar-fill"></span></div>
+      <svg class="intro-sun" viewBox="-100 -100 200 200" focusable="false">
+        <defs>
+          <polygon id="intro-ray" points="0,-88 12.5,-63 -12.5,-63" />
+        </defs>
+        <g class="intro-sun-rays">
+          <use href="#intro-ray" />
+          <use href="#intro-ray" transform="rotate(45)" />
+          <use href="#intro-ray" transform="rotate(90)" />
+          <use href="#intro-ray" transform="rotate(135)" />
+          <use href="#intro-ray" transform="rotate(180)" />
+          <use href="#intro-ray" transform="rotate(225)" />
+          <use href="#intro-ray" transform="rotate(270)" />
+          <use href="#intro-ray" transform="rotate(315)" />
+        </g>
+        <circle class="intro-sun-core" r="47" />
+      </svg>
     </div>
+    <div class="intro-wipe"></div>
   </div>
 
   <!-- Apple Frosted Glass Top Navigation (floating pill, appears on scroll) -->
@@ -149,7 +170,7 @@
     <section id="about" class="section section-about">
       <div class="container">
         <div class="profile-row reveal">
-          <img src="assets/images/pfp.jpg" alt="Muhammad Jundi Assabiq" class="profile-avatar" id="profile-avatar" onerror="this.onerror=null;this.src='assets/images/avatar.jpg'">
+          <img src="assets/images/pfp-160.webp" alt="Muhammad Jundi Assabiq" class="profile-avatar" id="profile-avatar" width="72" height="72" decoding="async" onerror="this.onerror=null;this.src='assets/images/pfp.jpg'">
           <div class="profile-meta">
             <h1 class="profile-name" id="profile-name">Muhammad Jundi Assabiq</h1>
             <p class="profile-bio" id="profile-bio">What's good?</p>
@@ -328,12 +349,48 @@
     </div>
   </footer>
 
-  <script src="assets/js/three.min.js"></script>
-  <script src="assets/js/intro.js"></script>
-  <script src="assets/js/earth.js"></script>
-  <script src="assets/js/moon.js"></script>
-  <script src="content.js"></script>
-  <script src="script.js"></script>
-  <script src="assets/js/cursor-trail.js"></script>
+  <!-- Progressive glass blur over content still below the fold (never over the footer) -->
+  <div class="scroll-blur" id="scroll-blur" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+  </div>
+
+  <!-- defer: download in parallel, run in this order after parsing -->
+  <script src="assets/js/intro.js" defer></script>
+  <script src="content.js" defer></script>
+  <script src="script.js" defer></script>
+  <script src="assets/js/cursor-trail.js" defer></script>
+  <script>
+    // The WebGL stack (three.js is ~600 KB) loads after the first paint, so it never
+    // competes with the HTML, CSS and font the page needs to render first.
+    (function () {
+      var started = false;
+      function load(src) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = false; // keep execution order
+          s.onload = resolve;
+          s.onerror = reject;
+          document.body.appendChild(s);
+        });
+      }
+      function start() {
+        if (started) return;
+        started = true;
+        load('assets/js/three.min.js')
+          .then(function () {
+            window.resolveThree();
+            return Promise.all([load('assets/js/earth.js'), load('assets/js/moon.js')]);
+          })
+          .catch(function (e) { window.rejectThree(e); });
+      }
+      try {
+        new PerformanceObserver(function (list, obs) {
+          if (list.getEntriesByName('first-contentful-paint').length) { obs.disconnect(); setTimeout(start, 0); }
+        }).observe({ type: 'paint', buffered: true });
+      } catch (e) { /* no paint timing support */ }
+      setTimeout(start, 1000); // fallback
+    })();
+  </script>
 </body>
 </html>
