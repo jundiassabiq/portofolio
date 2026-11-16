@@ -31,7 +31,7 @@
   <!-- Self-hosted Inter (variable, latin subset, one 47 KB file for every weight) -->
   <link rel="preload" as="font" href="assets/fonts/inter-latin.woff2" type="font/woff2" crossorigin>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261117">
   <script>
     // Set before first paint: enables JS-only styles and the intro animation.
     // The full intro plays once per browser session; later page loads get a quick fade.
@@ -355,10 +355,10 @@
   </div>
 
   <!-- defer: download in parallel, run in this order after parsing -->
-  <script src="assets/js/intro.js" defer></script>
-  <script src="content.js" defer></script>
-  <script src="script.js" defer></script>
-  <script src="assets/js/cursor-trail.js" defer></script>
+  <script src="assets/js/intro.js?v=20261117" defer></script>
+  <script src="content.js?v=20261117" defer></script>
+  <script src="script.js?v=20261117" defer></script>
+  <script src="assets/js/cursor-trail.js?v=20261117" defer></script>
   <script>
     // The WebGL stack (three.js is ~600 KB) loads after the first paint, so it never
     // competes with the HTML, CSS and font the page needs to render first.
@@ -380,7 +380,7 @@
         load('assets/js/three.min.js')
           .then(function () {
             window.resolveThree();
-            return Promise.all([load('assets/js/earth.js'), load('assets/js/moon.js')]);
+            return Promise.all([load('assets/js/earth.js?v=20261117'), load('assets/js/moon.js?v=20261117')]);
           })
           .catch(function (e) { window.rejectThree(e); });
       }
